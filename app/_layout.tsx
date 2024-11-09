@@ -1,37 +1,36 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { Stack } from 'expo-router'
+import * as SQLite from 'expo-sqlite'
+import React from 'react'
 
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+async function migrateDbIfNeeded() {
+  try {
+    /**
+     * DBが汚れた際に削除するためのコード
+     * const db = await SQLite.openDatabaseAsync("app.db");
+     * await db.closeAsync();
+     * await SQLite.deleteDatabaseAsync("app.db");
+     */
+    const db = await SQLite.openDatabaseAsync('app.db')
+    await db.execAsync(
+      `PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS remind (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          pushTime DATETIME NOT NULL,
+          pushed BOOLEAN NOT NULL DEFAULT 0
+        );`,
+    )
+  } catch (error) {
+    console.error('DBマイグレーションエラー:', error)
+  }
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <SQLite.SQLiteProvider databaseName="app.db" onInit={migrateDbIfNeeded}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
       </Stack>
-    </ThemeProvider>
-  );
+    </SQLite.SQLiteProvider>
+  )
 }
